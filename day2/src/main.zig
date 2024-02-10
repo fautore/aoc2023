@@ -73,6 +73,32 @@ fn isGameImpossible(self: Game, redLimit: u16, greenLimit: u16, blueLimit: u16) 
     return impossible;
 }
 
+fn calculateGamePower(self: Game) u32 {
+    var gamePower: u16 = 0;
+    var fewestRed: u16 = 0;
+    var fewestGreen: u16 = 0;
+    var fewestBlue: u16 = 0;
+    for (self.draws.items) |draw| {
+        if (draw.red) |red| {
+            if (red > fewestRed) {
+                fewestRed = red;
+            }
+        }
+        if (draw.green) |green| {
+            if (green > fewestGreen) {
+                fewestGreen = green;
+            }
+        }
+        if (draw.blue) |blue| {
+            if (blue > fewestBlue) {
+                fewestBlue = blue;
+            }
+        }
+    }
+    gamePower = fewestRed * fewestGreen * fewestBlue;
+    return gamePower;
+}
+
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
 
@@ -119,14 +145,43 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
     return solution;
 }
 
-fn solvePart2(input: []const []const u8) !u32 {
-    const total: u32 = 0;
-    const allocator = std.heap.page_allocator;
-    _ = allocator;
-    for (input) |row| {
-        _ = row;
+fn solvePart2(input: std.ArrayList(u8)) u32 {
+    var solution: u32 = 0;
+
+    var linesIter = std.mem.splitScalar(u8, input.items, '\n');
+    var games = std.ArrayList(Game).init(std.heap.page_allocator);
+    while (linesIter.next()) |row| {
+        //std.debug.print("\n{s}", .{row});
+        var lineIter = std.mem.splitSequence(u8, row, ": ");
+        const gameStr = lineIter.first();
+        if (std.mem.indexOf(u8, gameStr, " ")) |spacePos| {
+            const gameIdStr = gameStr[spacePos + 1 ..];
+            const trimmedNumberPart = std.mem.trim(u8, gameIdStr, " \n\r\t");
+            if (std.fmt.parseInt(u32, trimmedNumberPart, 10)) |gameId| {
+                var game = Game{ .Id = gameId, .draws = std.ArrayList(Draw).init(std.heap.page_allocator) };
+                if (lineIter.peek()) |cubeDraws| {
+                    var cubeDrawIterator = std.mem.splitSequence(u8, cubeDraws, "; ");
+                    while (cubeDrawIterator.next()) |drawStr| {
+                        std.debug.print("game {} drawStr {s}\n", .{ gameId, drawStr });
+                        const draw: Draw = parseDraw(drawStr);
+                        game.draws.append(draw) catch |err| {
+                            std.debug.print("error {}", .{err});
+                        };
+                    }
+                }
+                games.append(game) catch |err| {
+                    std.debug.print("{}", .{err});
+                };
+            } else |err| {
+                std.debug.print("failed to parse game id {}, idStr {s}\n", .{ err, gameIdStr });
+            }
+        }
     }
-    return total;
+    for (games.items) |game| {
+        const gamePower: u32 = calculateGamePower(game);
+        solution = solution + gamePower;
+    }
+    return solution;
 }
 
 pub fn main() !void {
@@ -134,7 +189,7 @@ pub fn main() !void {
     var lines = try readFile(allocator, "input/input");
     defer lines.deinit();
     std.debug.print("part 1 total: {}\n", .{solvePart1(lines)});
-    //std.debug.print("part 2 total: {}\n", .{solvePart2(lines.items)});
+    std.debug.print("part 2 total: {}\n", .{solvePart2(lines)});
 }
 
 test "test part 1" {
@@ -151,6 +206,15 @@ test "test part 1" {
     try std.testing.expect(solvePart1(fileContents) == 8);
 }
 test "test part 2" {
-    const input = [_][]const u8{ "two1nine", "eightwothree", "abcone2threexyz", "xtwone3four", "4nineeightseven2", "zoneight234", "7pqrstsixteen" };
-    try std.testing.expect(try solvePart2(&input) == 281);
+    const input =
+        \\Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+        \\Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+        \\Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+        \\Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+        \\Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+    ;
+    const allocator = std.heap.page_allocator;
+    var fileContents = std.ArrayList(u8).init(allocator);
+    try fileContents.appendSlice(input);
+    try std.testing.expect(solvePart2(fileContents) == 2286);
 }
