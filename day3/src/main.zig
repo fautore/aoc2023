@@ -13,23 +13,46 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
     return fileContents;
 }
 
-const EnginePart = struct {
-    col: i32,
-    row: i32,
-};
+fn calcRowSize(input: std.ArrayList(u8)) usize {
+    var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
+    return inputIterator.first().len;
+}
+
+fn calcEnginePartsAjacentPositions(row: usize, column: usize) std.ArrayList(struct { row: usize, column: usize }) {
+    var adjacentPositions = std.ArrayList(struct { row: usize, column: usize }).init(std.heap.page_allocator);
+    adjacentPositions.append(.{ .row = row - 1, .column = column - 1 }) catch |err| {
+        std.debug.print("{}", .{err});
+    };
+    adjacentPositions.append(.{ .row = row - 1, .column = column });
+    adjacentPositions.append(.{ .row = row - 1, .column = column + 1 });
+    adjacentPositions.append(.{ .row = row, .column = column - 1 });
+    adjacentPositions.append(.{ .row = row, .column = column });
+    adjacentPositions.append(.{ .row = row, .column = column + 1 });
+    adjacentPositions.append(.{ .row = row + 1, .column = column - 1 });
+    adjacentPositions.append(.{ .row = row + 1, .column = column });
+    adjacentPositions.append(.{ .row = row + 1, .column = column + 1 });
+    return adjacentPositions;
+}
+
+fn peek(input: std.ArrayList(u8), row: usize, column: usize) ?u8 {
+    const rowSize = calcRowSize(input);
+    var character: ?u8 = null;
+    character = input[row * rowSize + column];
+    return character;
+}
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     const solution: u32 = 0;
 
     var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
-    var engineParts = std.ArrayList(EnginePart).init(std.heap.page_allocator);
     var rowIndex: usize = 0; // to iterate and keep track of the row number
     while (inputIterator.next()) |row| {
         defer rowIndex += 1;
         for (row, 0..) |c, columnIndex| {
-            defer columnIndex += 1;
             if (c == '*' or c == '#' or c == '+' or c == '$') {
-                engineParts.append(EnginePart{ .row = rowIndex, .col = columnIndex });
+                for (calcEnginePartsAjacentPositions(rowIndex, columnIndex).items) |position| {
+                    std.debug.print("positon: {}", .{position});
+                }
             }
         }
     }
@@ -37,7 +60,11 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
     return solution;
 }
 
-fn solvePart2() void {}
+fn solvePart2(input: std.ArrayList(u8)) u32 {
+    _ = input;
+    const solution: u32 = 0;
+    return solution;
+}
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
