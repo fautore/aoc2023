@@ -18,28 +18,17 @@ fn calcRowSize(input: std.ArrayList(u8)) usize {
     return inputIterator.first().len;
 }
 
-fn calcEnginePartsAjacentPositions(row: usize, column: usize) std.ArrayList(struct { row: usize, column: usize }) {
-    var adjacentPositions = std.ArrayList(struct { row: usize, column: usize }).init(std.heap.page_allocator);
-    adjacentPositions.append(.{ .row = row - 1, .column = column - 1 }) catch |err| {
-        std.debug.print("{}", .{err});
-    };
-    adjacentPositions.append(.{ .row = row - 1, .column = column });
-    adjacentPositions.append(.{ .row = row - 1, .column = column + 1 });
-    adjacentPositions.append(.{ .row = row, .column = column - 1 });
-    adjacentPositions.append(.{ .row = row, .column = column });
-    adjacentPositions.append(.{ .row = row, .column = column + 1 });
-    adjacentPositions.append(.{ .row = row + 1, .column = column - 1 });
-    adjacentPositions.append(.{ .row = row + 1, .column = column });
-    adjacentPositions.append(.{ .row = row + 1, .column = column + 1 });
-    return adjacentPositions;
-}
-
 fn peek(input: std.ArrayList(u8), row: usize, column: usize) ?u8 {
     const rowSize = calcRowSize(input);
     var character: ?u8 = null;
-    character = input[row * rowSize + column];
+    character = input.items[row * rowSize + column];
     return character;
 }
+
+const Position = struct {
+    row: isize,
+    col: isize,
+};
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     const solution: u32 = 0;
@@ -50,13 +39,18 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
         defer rowIndex += 1;
         for (row, 0..) |c, columnIndex| {
             if (c == '*' or c == '#' or c == '+' or c == '$') {
-                for (calcEnginePartsAjacentPositions(rowIndex, columnIndex).items) |position| {
-                    std.debug.print("positon: {}", .{position});
+                const positions: [8]Position = .{ Position{ .row = -1, .col = -1 }, Position{ .row = -1, .col = 0 }, Position{ .row = -1, .col = 1 }, Position{ .row = 0, .col = -1 }, Position{ .row = 0, .col = 1 }, Position{ .row = 1, .col = -1 }, Position{ .row = 1, .col = 0 }, Position{ .row = 1, .col = 1 } };
+                for (positions) |p| {
+                    if (peek(input, rowIndex + p.row, columnIndex + p.col)) |character| {
+                        if (character != '.') {
+                            std.debug.print("{c} positions: {} {}\n", .{ character, p.row, p.col });
+                        }
+                    }
                 }
             }
         }
     }
-
+    std.debug.panic("qualcosa", .{});
     return solution;
 }
 
