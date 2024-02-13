@@ -18,6 +18,19 @@ fn calcRowSize(input: std.ArrayList(u8)) usize {
     return inputIterator.first().len;
 }
 
+fn applyOffset(value: usize, offset: isize) usize {
+    if (offset < 0) {
+        const abs_offset: usize = @intCast(-offset);
+        if (abs_offset > value) {
+            return 0;
+        }
+        return value - abs_offset;
+    } else {
+        const abs_offset: usize = @intCast(offset);
+        return value + abs_offset;
+    }
+}
+
 fn peek(input: std.ArrayList(u8), row: usize, column: usize) ?u8 {
     const rowSize = calcRowSize(input);
     var character: ?u8 = null;
@@ -41,7 +54,7 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
             if (c == '*' or c == '#' or c == '+' or c == '$') {
                 const positions: [8]Position = .{ Position{ .row = -1, .col = -1 }, Position{ .row = -1, .col = 0 }, Position{ .row = -1, .col = 1 }, Position{ .row = 0, .col = -1 }, Position{ .row = 0, .col = 1 }, Position{ .row = 1, .col = -1 }, Position{ .row = 1, .col = 0 }, Position{ .row = 1, .col = 1 } };
                 for (positions) |p| {
-                    if (peek(input, rowIndex + p.row, columnIndex + p.col)) |character| {
+                    if (peek(input, try applyOffset(rowIndex, p.row), try applyOffset(columnIndex, p.col))) |character| {
                         if (character != '.') {}
                     }
                 }
