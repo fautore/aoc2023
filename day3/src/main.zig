@@ -42,15 +42,13 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
                 const positions: [8]Position = .{ Position{ .row = -1, .col = -1 }, Position{ .row = -1, .col = 0 }, Position{ .row = -1, .col = 1 }, Position{ .row = 0, .col = -1 }, Position{ .row = 0, .col = 1 }, Position{ .row = 1, .col = -1 }, Position{ .row = 1, .col = 0 }, Position{ .row = 1, .col = 1 } };
                 for (positions) |p| {
                     if (peek(input, rowIndex + p.row, columnIndex + p.col)) |character| {
-                        if (character != '.') {
-                            std.debug.print("{c} positions: {} {}\n", .{ character, p.row, p.col });
-                        }
+                        if (character != '.') {}
                     }
                 }
             }
         }
     }
-    std.debug.panic("qualcosa", .{});
+    std.debug.panic("panic to read stuff", .{});
     return solution;
 }
 
