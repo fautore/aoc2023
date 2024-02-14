@@ -13,6 +13,38 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
     return fileContents;
 }
 
+const enginePartCharacters = [_]u8{ '*', '#', '+', '$' };
+fn isEnginePart(character: u8) bool {
+    for (enginePartCharacters) |enginePartCharacter| {
+        if (enginePartCharacter == character) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const EnginePart = struct { row: usize, column: usize };
+
+const EnginePartNumber = struct {
+    value: u32,
+    row: usize,
+    startColumn: usize,
+    endColumn: usize,
+    hasEnginePart: bool,
+
+    pub fn belongsToEnginePart(self: *EnginePartNumber, enginePart: EnginePart) bool {
+        std.debug.print("part: r:{} | sc:{} | ec:{}   engine: er:{} | ec:{}", .{ self.row, self.startColumn, self.endColumn, enginePart.row, enginePart.column });
+        if (self.row >= applyOffset(enginePart.row, -1) and self.row <= applyOffset(enginePart.row, 1)) {
+            if (enginePart.column >= applyOffset(self.startColumn, -1) and enginePart.column <= applyOffset(self.endColumn, 1)) {
+                std.debug.print(" -> true\n", .{});
+                return true;
+            }
+        }
+        std.debug.print(" -> false\n", .{});
+        return false;
+    }
+};
+
 fn calcRowSize(input: std.ArrayList(u8)) usize {
     var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
     return inputIterator.first().len;
@@ -38,69 +70,67 @@ fn peek(input: std.ArrayList(u8), row: usize, column: usize) ?u8 {
     return character;
 }
 
-const Position = struct {
-    row: isize,
-    col: isize,
-};
+fn iterateRows(input: std.ArrayList(u8)) void {
+    var engineParts = std.ArrayList(EnginePart).init(std.heap.page_allocator);
+    var enginePartNumbers = std.ArrayList(EnginePartNumber).init(std.heap.page_allocator);
+
+    var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
+    var i: usize = 0; // to iterate and keep track of the row number
+    while (inputIterator.next()) |row| {
+        defer i += 1;
+        iterateRow(row, i, &engineParts, &enginePartNumbers);
+    }
+    for (enginePartNumbers.items) |epn| {
+        std.debug.print("{} | {}\n", .{ epn.value, epn.hasEnginePart });
+    }
+}
+
+fn iterateRow(row: []const u8, r: usize, engineParts: *std.ArrayList(EnginePart), enginePartNumbers: *std.ArrayList(EnginePartNumber)) void {
+    var c: usize = 0;
+    var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
+    var currentNumberStart: usize = 0;
+    for (row) |character| {
+        defer c += 1;
+        if (character == '.') {
+            if (currentNumberTempCharacterBuffer.items.len != 0) {
+                const newPartValue = std.fmt.parseInt(u32, currentNumberTempCharacterBuffer.items, 10) catch |err| {
+                    std.debug.panic("Error encountered while parsing int {}\nvalue {c}", .{ err, currentNumberTempCharacterBuffer.items });
+                };
+                var newPartNumber = EnginePartNumber{ .row = r, .startColumn = currentNumberStart, .endColumn = c - 1, .value = newPartValue, .hasEnginePart = false };
+                for (engineParts.items) |enginePart| {
+                    if (EnginePartNumber.belongsToEnginePart(&newPartNumber, enginePart)) {
+                        newPartNumber.hasEnginePart = true;
+                    }
+                }
+                enginePartNumbers.append(newPartNumber) catch |err| {
+                    std.debug.panic("{}\n", .{err});
+                };
+            }
+            currentNumberTempCharacterBuffer.clearAndFree();
+            currentNumberStart = c + 1;
+            continue;
+        }
+        if (isEnginePart(character)) {
+            const newEnginePart = EnginePart{ .row = r, .column = c };
+            engineParts.append(newEnginePart) catch |err| {
+                std.debug.panic("{}\n", .{err});
+            };
+            for (enginePartNumbers.items) |*enginePartNumber| {
+                if (EnginePartNumber.belongsToEnginePart(enginePartNumber, newEnginePart)) {
+                    enginePartNumber.hasEnginePart = true;
+                }
+            }
+            continue;
+        }
+        currentNumberTempCharacterBuffer.append(character) catch |err| {
+            std.debug.panic("{}\n", .{err});
+        };
+    }
+}
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     const solution: u32 = 0;
-
-    var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
-    var rowIndex: usize = 0; // to iterate and keep track of the row number
-    while (inputIterator.next()) |row| {
-        defer rowIndex += 1;
-        for (row, 0..) |c, columnIndex| {
-            if (c == '*' or c == '#' or c == '+' or c == '$') {
-                const positions: [8]Position = .{ Position{ .row = -1, .col = -1 }, Position{ .row = -1, .col = 0 }, Position{ .row = -1, .col = 1 }, Position{ .row = 0, .col = -1 }, Position{ .row = 0, .col = 1 }, Position{ .row = 1, .col = -1 }, Position{ .row = 1, .col = 0 }, Position{ .row = 1, .col = 1 } };
-                for (positions) |p| {
-                    const pRow = applyOffset(rowIndex, p.row);
-                    const pCol = applyOffset(columnIndex, p.col);
-                    if (peek(input, pRow, pCol)) |character| {
-                        if (character != '.') {
-                            std.debug.print("row: {}", .{pRow});
-                            var startColumn = pCol;
-                            var endColumn = pCol;
-                            var prevCol = startColumn;
-                            var nextCol = endColumn;
-                            while (true) {
-                                prevCol = applyOffset(prevCol, -1);
-                                std.debug.print(" {}", .{prevCol});
-                                if (prevCol == 0) {
-                                    startColumn = prevCol;
-                                    break;
-                                }
-                                if (peek(input, pRow, prevCol)) |charAtPrevCol| {
-                                    std.debug.print(" {c}", .{charAtPrevCol});
-                                    if (charAtPrevCol == '.' or charAtPrevCol == '*' or charAtPrevCol == '#' or charAtPrevCol == '+' or charAtPrevCol == '$') {
-                                        break;
-                                    }
-                                }
-                                startColumn = prevCol;
-                            }
-                            std.debug.print("start: {}", .{startColumn});
-                            while (true) {
-                                nextCol = applyOffset(nextCol, 1);
-                                std.debug.print(" {}", .{nextCol});
-                                if (nextCol == calcRowSize(input)) {
-                                    endColumn = nextCol;
-                                    break;
-                                }
-                                if (peek(input, pRow, nextCol)) |charAtNextCol| {
-                                    std.debug.print(" {c}", .{charAtNextCol});
-                                    if (charAtNextCol == '.' or charAtNextCol == '*' or charAtNextCol == '#' or charAtNextCol == '+' or charAtNextCol == '$') {
-                                        break;
-                                    }
-                                }
-                                endColumn = nextCol;
-                            }
-                            std.debug.print("end: {}\n", .{endColumn});
-                        }
-                    }
-                }
-            }
-        }
-    }
+    iterateRows(input);
     std.debug.panic("panic to read stuff", .{});
     return solution;
 }
