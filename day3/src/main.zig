@@ -54,8 +54,48 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
             if (c == '*' or c == '#' or c == '+' or c == '$') {
                 const positions: [8]Position = .{ Position{ .row = -1, .col = -1 }, Position{ .row = -1, .col = 0 }, Position{ .row = -1, .col = 1 }, Position{ .row = 0, .col = -1 }, Position{ .row = 0, .col = 1 }, Position{ .row = 1, .col = -1 }, Position{ .row = 1, .col = 0 }, Position{ .row = 1, .col = 1 } };
                 for (positions) |p| {
-                    if (peek(input, try applyOffset(rowIndex, p.row), try applyOffset(columnIndex, p.col))) |character| {
-                        if (character != '.') {}
+                    const pRow = applyOffset(rowIndex, p.row);
+                    const pCol = applyOffset(columnIndex, p.col);
+                    if (peek(input, pRow, pCol)) |character| {
+                        if (character != '.') {
+                            std.debug.print("row: {}", .{pRow});
+                            var startColumn = pCol;
+                            var endColumn = pCol;
+                            var prevCol = startColumn;
+                            var nextCol = endColumn;
+                            while (true) {
+                                prevCol = applyOffset(prevCol, -1);
+                                std.debug.print(" {}", .{prevCol});
+                                if (prevCol == 0) {
+                                    startColumn = prevCol;
+                                    break;
+                                }
+                                if (peek(input, pRow, prevCol)) |charAtPrevCol| {
+                                    std.debug.print(" {c}", .{charAtPrevCol});
+                                    if (charAtPrevCol == '.' or charAtPrevCol == '*' or charAtPrevCol == '#' or charAtPrevCol == '+' or charAtPrevCol == '$') {
+                                        break;
+                                    }
+                                }
+                                startColumn = prevCol;
+                            }
+                            std.debug.print("start: {}", .{startColumn});
+                            while (true) {
+                                nextCol = applyOffset(nextCol, 1);
+                                std.debug.print(" {}", .{nextCol});
+                                if (nextCol == calcRowSize(input)) {
+                                    endColumn = nextCol;
+                                    break;
+                                }
+                                if (peek(input, pRow, nextCol)) |charAtNextCol| {
+                                    std.debug.print(" {c}", .{charAtNextCol});
+                                    if (charAtNextCol == '.' or charAtNextCol == '*' or charAtNextCol == '#' or charAtNextCol == '+' or charAtNextCol == '$') {
+                                        break;
+                                    }
+                                }
+                                endColumn = nextCol;
+                            }
+                            std.debug.print("end: {}\n", .{endColumn});
+                        }
                     }
                 }
             }
