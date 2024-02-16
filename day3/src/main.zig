@@ -13,43 +13,6 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
     return fileContents;
 }
 
-const enginePartCharacters = [_]u8{ '*', '#', '+', '$' };
-fn isEnginePart(character: u8) bool {
-    for (enginePartCharacters) |enginePartCharacter| {
-        if (enginePartCharacter == character) {
-            return true;
-        }
-    }
-    return false;
-}
-
-const EnginePart = struct { row: usize, column: usize };
-
-const EnginePartNumber = struct {
-    value: u32,
-    row: usize,
-    startColumn: usize,
-    endColumn: usize,
-    hasEnginePart: bool,
-
-    pub fn belongsToEnginePart(self: *EnginePartNumber, enginePart: EnginePart) bool {
-        std.debug.print("part: r:{} | sc:{} | ec:{}   engine: er:{} | ec:{}", .{ self.row, self.startColumn, self.endColumn, enginePart.row, enginePart.column });
-        if (self.row >= applyOffset(enginePart.row, -1) and self.row <= applyOffset(enginePart.row, 1)) {
-            if (enginePart.column >= applyOffset(self.startColumn, -1) and enginePart.column <= applyOffset(self.endColumn, 1)) {
-                std.debug.print(" -> true\n", .{});
-                return true;
-            }
-        }
-        std.debug.print(" -> false\n", .{});
-        return false;
-    }
-};
-
-fn calcRowSize(input: std.ArrayList(u8)) usize {
-    var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
-    return inputIterator.first().len;
-}
-
 fn applyOffset(value: usize, offset: isize) usize {
     if (offset < 0) {
         const abs_offset: usize = @intCast(-offset);
@@ -63,75 +26,116 @@ fn applyOffset(value: usize, offset: isize) usize {
     }
 }
 
-fn peek(input: std.ArrayList(u8), row: usize, column: usize) ?u8 {
-    const rowSize = calcRowSize(input);
-    var character: ?u8 = null;
-    character = input.items[row * rowSize + column];
-    return character;
+const EnginePart = struct { row: usize, column: usize };
+const enginePartCharacters = [_]u8{ '*', '#', '+', '$', '@', '&', '/', '=', '%', '-' };
+fn isEnginePart(character: u8) bool {
+    for (enginePartCharacters) |enginePartCharacter| {
+        if (enginePartCharacter == character) {
+            return true;
+        }
+    }
+    return false;
 }
-
-fn iterateRows(input: std.ArrayList(u8)) void {
+fn findAllEngineParts(input: std.ArrayList(u8)) std.ArrayList(EnginePart) {
     var engineParts = std.ArrayList(EnginePart).init(std.heap.page_allocator);
-    var enginePartNumbers = std.ArrayList(EnginePartNumber).init(std.heap.page_allocator);
 
-    var inputIterator = std.mem.splitScalar(u8, input.items, '\n');
-    var i: usize = 0; // to iterate and keep track of the row number
-    while (inputIterator.next()) |row| {
-        defer i += 1;
-        iterateRow(row, i, &engineParts, &enginePartNumbers);
-    }
-    for (enginePartNumbers.items) |epn| {
-        std.debug.print("{} | {}\n", .{ epn.value, epn.hasEnginePart });
-    }
-}
-
-fn iterateRow(row: []const u8, r: usize, engineParts: *std.ArrayList(EnginePart), enginePartNumbers: *std.ArrayList(EnginePartNumber)) void {
-    var c: usize = 0;
-    var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
-    var currentNumberStart: usize = 0;
-    for (row) |character| {
-        defer c += 1;
-        if (character == '.') {
-            if (currentNumberTempCharacterBuffer.items.len != 0) {
-                const newPartValue = std.fmt.parseInt(u32, currentNumberTempCharacterBuffer.items, 10) catch |err| {
-                    std.debug.panic("Error encountered while parsing int {}\nvalue {c}", .{ err, currentNumberTempCharacterBuffer.items });
-                };
-                var newPartNumber = EnginePartNumber{ .row = r, .startColumn = currentNumberStart, .endColumn = c - 1, .value = newPartValue, .hasEnginePart = false };
-                for (engineParts.items) |enginePart| {
-                    if (EnginePartNumber.belongsToEnginePart(&newPartNumber, enginePart)) {
-                        newPartNumber.hasEnginePart = true;
-                    }
-                }
-                enginePartNumbers.append(newPartNumber) catch |err| {
+    var rowIterator = std.mem.splitScalar(u8, input.items, '\n');
+    var rowIndex: usize = 0;
+    while (rowIterator.next()) |row| {
+        defer rowIndex += 1;
+        for (row, 0..) |character, columnIndex| {
+            if (isEnginePart(character)) {
+                const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex };
+                engineParts.append(newEnginePart) catch |err| {
                     std.debug.panic("{}\n", .{err});
                 };
             }
-            currentNumberTempCharacterBuffer.clearAndFree();
-            currentNumberStart = c + 1;
-            continue;
         }
-        if (isEnginePart(character)) {
-            const newEnginePart = EnginePart{ .row = r, .column = c };
-            engineParts.append(newEnginePart) catch |err| {
-                std.debug.panic("{}\n", .{err});
-            };
-            for (enginePartNumbers.items) |*enginePartNumber| {
-                if (EnginePartNumber.belongsToEnginePart(enginePartNumber, newEnginePart)) {
-                    enginePartNumber.hasEnginePart = true;
-                }
-            }
-            continue;
-        }
-        currentNumberTempCharacterBuffer.append(character) catch |err| {
-            std.debug.panic("{}\n", .{err});
-        };
     }
+    return engineParts;
+}
+
+const EnginePartNumber = struct {
+    value: u32,
+    row: usize,
+    startColumn: usize,
+    endColumn: usize,
+    hasEnginePart: bool,
+
+    pub fn isNearEnginePart(self: *EnginePartNumber, enginePart: EnginePart) bool {
+        if (applyOffset(self.row, -1) <= enginePart.row and applyOffset(self.row, 1) >= enginePart.row) {
+            if (applyOffset(self.startColumn, -1) <= enginePart.column and applyOffset(self.endColumn, 1) >= enginePart.column) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+fn createNewEnginePartNumber(characterBuffer: std.ArrayList(u8), row: usize, startColumn: usize, endColumn: usize, partNumberList: *std.ArrayList(EnginePartNumber)) EnginePartNumber {
+    const newPartValue = std.fmt.parseInt(u32, characterBuffer.items, 10) catch |err| {
+        std.debug.panic("Error encountered while parsing int {}\nvalue {c}", .{ err, characterBuffer.items });
+    };
+    const newPartNumber = EnginePartNumber{ .row = row, .startColumn = startColumn, .endColumn = endColumn, .value = newPartValue, .hasEnginePart = false };
+    partNumberList.append(newPartNumber) catch |err| {
+        std.debug.panic("{}\n", .{err});
+    };
+    return newPartNumber;
+}
+
+fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNumber) {
+    var enginePartNumbers = std.ArrayList(EnginePartNumber).init(std.heap.page_allocator);
+
+    var rowIterator = std.mem.splitScalar(u8, input.items, '\n');
+    var rowIndex: usize = 0;
+    while (rowIterator.next()) |row| {
+        defer rowIndex += 1;
+        var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
+        var currentNumberStartColumn: usize = 0;
+        for (row, 0..) |character, columnIndex| {
+            if (character == '.' or isEnginePart(character)) {
+                if (currentNumberTempCharacterBuffer.items.len != 0) {
+                    _ = createNewEnginePartNumber(currentNumberTempCharacterBuffer, rowIndex, currentNumberStartColumn, columnIndex - 1, &enginePartNumbers);
+                    currentNumberTempCharacterBuffer.clearAndFree();
+                }
+                currentNumberStartColumn = columnIndex + 1;
+            } else {
+                currentNumberTempCharacterBuffer.append(character) catch |err| {
+                    std.debug.panic("{}\n", .{err});
+                };
+            }
+        }
+    }
+    return enginePartNumbers;
 }
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
-    const solution: u32 = 0;
-    iterateRows(input);
-    std.debug.panic("panic to read stuff", .{});
+    var solution: u32 = 0;
+    const enginePartList = findAllEngineParts(input);
+    var enginePartNumbers = findAllEnginePartNumbers(input);
+
+    var i: usize = 0;
+    while (i < enginePartNumbers.items.len) {
+        var enginePartNumber = enginePartNumbers.items[i];
+        for (enginePartList.items) |enginePart| {
+            if (enginePartNumber.hasEnginePart) {
+                continue;
+            }
+            if (EnginePartNumber.isNearEnginePart(&enginePartNumber, enginePart)) {
+                enginePartNumber.hasEnginePart = true;
+            }
+            std.debug.print("epn {any}, ep: {}\n", .{ enginePartNumber, enginePart });
+        }
+        if (!enginePartNumber.hasEnginePart) {
+            _ = enginePartNumbers.orderedRemove(i);
+        } else {
+            i += 1;
+        }
+    }
+    for (enginePartNumbers.items) |epn| {
+        std.debug.print("{}\n", .{epn.value});
+        solution += epn.value;
+    }
     return solution;
 }
 
@@ -184,4 +188,16 @@ test "test part 2" {
     var fileContents = std.ArrayList(u8).init(allocator);
     try fileContents.appendSlice(input);
     try std.testing.expect(solvePart2(fileContents) == 2286);
+}
+test "belongsToEnginePart => true" {
+    var enginePartnumber = EnginePartNumber{ .row = 0, .startColumn = 3, .endColumn = 5, .value = 100, .hasEnginePart = false };
+    const enginePart = EnginePart{ .row = 0, .column = 2 };
+    const result = enginePartnumber.isNearEnginePart(enginePart);
+    try std.testing.expect(result);
+}
+test "belongsToEnginePart => false" {
+    var enginePartnumber = EnginePartNumber{ .row = 0, .startColumn = 3, .endColumn = 5, .value = 100, .hasEnginePart = false };
+    const enginePart = EnginePart{ .row = 0, .column = 10 };
+    const result = enginePartnumber.isNearEnginePart(enginePart);
+    try std.testing.expect(result == false);
 }
