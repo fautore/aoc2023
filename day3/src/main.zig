@@ -93,16 +93,17 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
         var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
         var currentNumberStartColumn: usize = 0;
         for (row, 0..) |character, columnIndex| {
-            if (character == '.' or isEnginePart(character)) {
+            if (character != '.' and !isEnginePart(character)) {
+                currentNumberTempCharacterBuffer.append(character) catch |err| {
+                    std.debug.panic("{}\n", .{err});
+                };
+            }
+            if (character == '.' or isEnginePart(character) or columnIndex + 1 == row.len) {
                 if (currentNumberTempCharacterBuffer.items.len != 0) {
                     _ = createNewEnginePartNumber(currentNumberTempCharacterBuffer, rowIndex, currentNumberStartColumn, columnIndex - 1, &enginePartNumbers);
                     currentNumberTempCharacterBuffer.clearAndFree();
                 }
                 currentNumberStartColumn = columnIndex + 1;
-            } else {
-                currentNumberTempCharacterBuffer.append(character) catch |err| {
-                    std.debug.panic("{}\n", .{err});
-                };
             }
         }
     }
@@ -115,26 +116,21 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
     var enginePartNumbers = findAllEnginePartNumbers(input);
 
     var i: usize = 0;
-    while (i < enginePartNumbers.items.len) {
-        var enginePartNumber = enginePartNumbers.items[i];
+    while (i < enginePartNumbers.items.len) : (i += 1) {
+        var partNumber = &enginePartNumbers.items[i];
+        if (partNumber.hasEnginePart) {
+            continue;
+        }
         for (enginePartList.items) |enginePart| {
-            if (enginePartNumber.hasEnginePart) {
-                continue;
+            if (EnginePartNumber.isNearEnginePart(partNumber, enginePart)) {
+                partNumber.hasEnginePart = true;
+                //std.debug.print("epn {}, ep: {}\n", .{ enginePartNumber, enginePart });
             }
-            if (EnginePartNumber.isNearEnginePart(&enginePartNumber, enginePart)) {
-                enginePartNumber.hasEnginePart = true;
-            }
-            std.debug.print("epn {any}, ep: {}\n", .{ enginePartNumber, enginePart });
         }
-        if (!enginePartNumber.hasEnginePart) {
-            _ = enginePartNumbers.orderedRemove(i);
-        } else {
-            i += 1;
+        std.debug.print("epn:{}\n", .{partNumber});
+        if (partNumber.hasEnginePart) {
+            solution += partNumber.value;
         }
-    }
-    for (enginePartNumbers.items) |epn| {
-        std.debug.print("{}\n", .{epn.value});
-        solution += epn.value;
     }
     return solution;
 }
@@ -158,7 +154,7 @@ test "test part 1" {
         \\467..114..
         \\...*......
         \\..35..633.
-        \\......#...
+        \\......#300
         \\617*......
         \\.....+.58.
         \\..592.....
@@ -169,7 +165,10 @@ test "test part 1" {
     const allocator = std.heap.page_allocator;
     var fileContents = std.ArrayList(u8).init(allocator);
     try fileContents.appendSlice(input);
-    try std.testing.expect(solvePart1(fileContents) == 4361);
+    const solution = solvePart1(fileContents);
+    std.testing.expect(solution == 4661) catch |err| {
+        std.debug.print("Test error: {} value: {} should be 4361\n", .{ err, solution });
+    };
 }
 test "test part 2" {
     const input =
