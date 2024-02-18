@@ -29,12 +29,23 @@ fn applyOffset(value: usize, offset: isize) usize {
 const EnginePart = struct {
     row: usize,
     column: usize,
-        pub fn isGear(self: *EnginePart, partNumbers: *std.ArrayList(EnginePartNumber)) bool {
-            _ = partNumbers;
-            _ = self;}
+    partNumbers: ?std.ArrayList(*EnginePartNumber),
+
+    pub fn assignPartNumber(self: *EnginePart, enginePartNumber: *EnginePartNumber) void {
+        if (self.partNumbers) |partNumbers| {
+            partNumbers.append(&enginePartNumber) catch |err| {
+                std.debug.panic("{}", .{err});
+            };
+        } else {
+            self.partNumbers = std.ArrayList(*EnginePartNumber).init(std.heap.page_allocator);
+            self.partNumbers.append(&enginePartNumber) catch |err| {
+                std.debug.panic("{}", .{err});
+            };
+        }
+    }
 };
 const enginePartCharacters = [_]u8{ '*', '#', '+', '$', '@', '&', '/', '=', '%', '-' };
-fn isEnginePart(character: u8, filter: []u8) bool {
+fn isEnginePart(character: u8, filter: []const u8) bool {
     for (filter) |enginePartCharacter| {
         if (enginePartCharacter == character) {
             return true;
@@ -42,7 +53,7 @@ fn isEnginePart(character: u8, filter: []u8) bool {
     }
     return false;
 }
-fn findAllEngineParts(input: std.ArrayList(u8), filter: []u8) std.ArrayList(EnginePart) {
+fn findAllEngineParts(input: std.ArrayList(u8), filter: []const u8) std.ArrayList(EnginePart) {
     var engineParts = std.ArrayList(EnginePart).init(std.heap.page_allocator);
 
     var rowIterator = std.mem.splitScalar(u8, input.items, '\n');
@@ -51,7 +62,7 @@ fn findAllEngineParts(input: std.ArrayList(u8), filter: []u8) std.ArrayList(Engi
         defer rowIndex += 1;
         for (row, 0..) |character, columnIndex| {
             if (isEnginePart(character, filter)) {
-                const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex };
+                const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex, .partNumbers = std.ArrayList(*EnginePartNumber).init(std.heap.page_allocator) };
                 engineParts.append(newEnginePart) catch |err| {
                     std.debug.panic("{}\n", .{err});
                 };
@@ -99,12 +110,12 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
         var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
         var currentNumberStartColumn: usize = 0;
         for (row, 0..) |character, columnIndex| {
-            if (character != '.' and !isEnginePart(character, enginePartCharacters)) {
+            if (character != '.' and !isEnginePart(character, &enginePartCharacters)) {
                 currentNumberTempCharacterBuffer.append(character) catch |err| {
                     std.debug.panic("{}\n", .{err});
                 };
             }
-            if (character == '.' or isEnginePart(character, enginePartCharacters) or columnIndex + 1 == row.len) {
+            if (character == '.' or isEnginePart(character, &enginePartCharacters) or columnIndex + 1 == row.len) {
                 if (currentNumberTempCharacterBuffer.items.len != 0) {
                     _ = createNewEnginePartNumber(currentNumberTempCharacterBuffer, rowIndex, currentNumberStartColumn, columnIndex - 1, &enginePartNumbers);
                     currentNumberTempCharacterBuffer.clearAndFree();
@@ -118,7 +129,7 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
-    const enginePartList = findAllEngineParts(input, enginePartCharacters);
+    var enginePartList = findAllEngineParts(input, &enginePartCharacters);
     var enginePartNumbers = findAllEnginePartNumbers(input);
 
     var i: usize = 0;
@@ -127,11 +138,13 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
         if (partNumber.hasEnginePart) {
             continue;
         }
-        for (enginePartList.items) |enginePart| {
-            if (EnginePartNumber.isNearEnginePart(partNumber, enginePart)) {
+        for (enginePartList.items, 0..) |enginePart, partIndex| {
+            if (partNumber.isNearEnginePart(enginePart)) {
                 partNumber.hasEnginePart = true;
+                enginePartList.items[partIndex].assignPartNumber(partNumber);
                 //std.debug.print("epn {}, ep: {}\n", .{ enginePartNumber, enginePart });
             }
+            std.debug.print("{}", .{enginePart});
         }
         std.debug.print("epn:{}\n", .{partNumber});
         if (partNumber.hasEnginePart) {
@@ -143,11 +156,29 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
 
 fn solvePart2(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
-    _ = solution;
-    const engineParts = findAllEngineParts(input, [_]u8{'*'});
-    _ = engineParts;
+    var enginePartList = findAllEngineParts(input, &[_]u8{'*'});
     var enginePartNumbers = findAllEnginePartNumbers(input);
-    _ = enginePartNumbers;
+
+    var i: usize = 0;
+    while (i < enginePartNumbers.items.len) : (i += 1) {
+        var partNumber = &enginePartNumbers.items[i];
+        if (partNumber.hasEnginePart) {
+            continue;
+        }
+        for (enginePartList.items, 0..) |enginePart, partIndex| {
+            if (partNumber.isNearEnginePart(enginePart)) {
+                partNumber.hasEnginePart = true;
+                enginePartList.items[partIndex].assignPartNumber(partNumber);
+                //std.debug.print("epn {}, ep: {}\n", .{ enginePartNumber, enginePart });
+            }
+            std.debug.print("{}", .{enginePart});
+        }
+        std.debug.print("epn:{}\n", .{partNumber});
+        if (partNumber.hasEnginePart) {
+            solution += partNumber.value;
+        }
+    }
+    return solution;
 }
 
 pub fn main() !void {
@@ -202,13 +233,13 @@ test "test part 2" {
 }
 test "belongsToEnginePart => true" {
     var enginePartnumber = EnginePartNumber{ .row = 0, .startColumn = 3, .endColumn = 5, .value = 100, .hasEnginePart = false };
-    const enginePart = EnginePart{ .row = 0, .column = 2 };
+    const enginePart = EnginePart{ .row = 0, .column = 2, .partNumbers = null };
     const result = enginePartnumber.isNearEnginePart(enginePart);
     try std.testing.expect(result);
 }
 test "belongsToEnginePart => false" {
     var enginePartnumber = EnginePartNumber{ .row = 0, .startColumn = 3, .endColumn = 5, .value = 100, .hasEnginePart = false };
-    const enginePart = EnginePart{ .row = 0, .column = 10 };
+    const enginePart = EnginePart{ .row = 0, .column = 10, .partNumbers = null };
     const result = enginePartnumber.isNearEnginePart(enginePart);
     try std.testing.expect(result == false);
 }
