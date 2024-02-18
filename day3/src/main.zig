@@ -26,17 +26,23 @@ fn applyOffset(value: usize, offset: isize) usize {
     }
 }
 
-const EnginePart = struct { row: usize, column: usize };
+const EnginePart = struct {
+    row: usize,
+    column: usize,
+        pub fn isGear(self: *EnginePart, partNumbers: *std.ArrayList(EnginePartNumber)) bool {
+            _ = partNumbers;
+            _ = self;}
+};
 const enginePartCharacters = [_]u8{ '*', '#', '+', '$', '@', '&', '/', '=', '%', '-' };
-fn isEnginePart(character: u8) bool {
-    for (enginePartCharacters) |enginePartCharacter| {
+fn isEnginePart(character: u8, filter: []u8) bool {
+    for (filter) |enginePartCharacter| {
         if (enginePartCharacter == character) {
             return true;
         }
     }
     return false;
 }
-fn findAllEngineParts(input: std.ArrayList(u8)) std.ArrayList(EnginePart) {
+fn findAllEngineParts(input: std.ArrayList(u8), filter: []u8) std.ArrayList(EnginePart) {
     var engineParts = std.ArrayList(EnginePart).init(std.heap.page_allocator);
 
     var rowIterator = std.mem.splitScalar(u8, input.items, '\n');
@@ -44,7 +50,7 @@ fn findAllEngineParts(input: std.ArrayList(u8)) std.ArrayList(EnginePart) {
     while (rowIterator.next()) |row| {
         defer rowIndex += 1;
         for (row, 0..) |character, columnIndex| {
-            if (isEnginePart(character)) {
+            if (isEnginePart(character, filter)) {
                 const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex };
                 engineParts.append(newEnginePart) catch |err| {
                     std.debug.panic("{}\n", .{err});
@@ -93,12 +99,12 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
         var currentNumberTempCharacterBuffer = std.ArrayList(u8).init(std.heap.page_allocator);
         var currentNumberStartColumn: usize = 0;
         for (row, 0..) |character, columnIndex| {
-            if (character != '.' and !isEnginePart(character)) {
+            if (character != '.' and !isEnginePart(character, enginePartCharacters)) {
                 currentNumberTempCharacterBuffer.append(character) catch |err| {
                     std.debug.panic("{}\n", .{err});
                 };
             }
-            if (character == '.' or isEnginePart(character) or columnIndex + 1 == row.len) {
+            if (character == '.' or isEnginePart(character, enginePartCharacters) or columnIndex + 1 == row.len) {
                 if (currentNumberTempCharacterBuffer.items.len != 0) {
                     _ = createNewEnginePartNumber(currentNumberTempCharacterBuffer, rowIndex, currentNumberStartColumn, columnIndex - 1, &enginePartNumbers);
                     currentNumberTempCharacterBuffer.clearAndFree();
@@ -112,7 +118,7 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
-    const enginePartList = findAllEngineParts(input);
+    const enginePartList = findAllEngineParts(input, enginePartCharacters);
     var enginePartNumbers = findAllEnginePartNumbers(input);
 
     var i: usize = 0;
@@ -136,9 +142,12 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
 }
 
 fn solvePart2(input: std.ArrayList(u8)) u32 {
-    _ = input;
-    const solution: u32 = 0;
-    return solution;
+    var solution: u32 = 0;
+    _ = solution;
+    const engineParts = findAllEngineParts(input, [_]u8{'*'});
+    _ = engineParts;
+    var enginePartNumbers = findAllEnginePartNumbers(input);
+    _ = enginePartNumbers;
 }
 
 pub fn main() !void {
@@ -186,7 +195,10 @@ test "test part 2" {
     const allocator = std.heap.page_allocator;
     var fileContents = std.ArrayList(u8).init(allocator);
     try fileContents.appendSlice(input);
-    try std.testing.expect(solvePart2(fileContents) == 2286);
+    const solution = solvePart2(fileContents);
+    std.testing.expect(solution == 467835) catch |err| {
+        std.debug.print("Test error: {} value: {} should be 4361\n", .{ err, solution });
+    };
 }
 test "belongsToEnginePart => true" {
     var enginePartnumber = EnginePartNumber{ .row = 0, .startColumn = 3, .endColumn = 5, .value = 100, .hasEnginePart = false };
