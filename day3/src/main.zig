@@ -29,19 +29,28 @@ fn applyOffset(value: usize, offset: isize) usize {
 const EnginePart = struct {
     row: usize,
     column: usize,
-    partNumbers: ?std.ArrayList(*EnginePartNumber),
+    partNumbers: ?std.ArrayList(EnginePartNumber),
 
-    pub fn assignPartNumber(self: *EnginePart, enginePartNumber: *EnginePartNumber) void {
-        if (self.partNumbers) |partNumbers| {
-            partNumbers.append(&enginePartNumber) catch |err| {
+    pub fn assignPartNumber(self: *EnginePart, enginePartNumber: EnginePartNumber) void {
+        if (self.partNumbers) |*partNumbers| {
+            partNumbers.append(enginePartNumber) catch |err| {
                 std.debug.panic("{}", .{err});
             };
         } else {
-            self.partNumbers = std.ArrayList(*EnginePartNumber).init(std.heap.page_allocator);
-            self.partNumbers.append(&enginePartNumber) catch |err| {
+            self.partNumbers = std.ArrayList(EnginePartNumber).init(std.heap.page_allocator);
+            self.partNumbers.?.append(enginePartNumber) catch |err| {
                 std.debug.panic("{}", .{err});
             };
         }
+    }
+    pub fn print(self: *const EnginePart) void {
+        std.debug.print("r:{} c:{} | ", .{ self.row, self.column });
+        if (self.partNumbers) |partNumbers| {
+            for (partNumbers.items) |pn| {
+                std.debug.print("{}, ", .{pn.value});
+            }
+        }
+        std.debug.print("\n", .{});
     }
 };
 const enginePartCharacters = [_]u8{ '*', '#', '+', '$', '@', '&', '/', '=', '%', '-' };
@@ -62,7 +71,7 @@ fn findAllEngineParts(input: std.ArrayList(u8), filter: []const u8) std.ArrayLis
         defer rowIndex += 1;
         for (row, 0..) |character, columnIndex| {
             if (isEnginePart(character, filter)) {
-                const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex, .partNumbers = std.ArrayList(*EnginePartNumber).init(std.heap.page_allocator) };
+                const newEnginePart = EnginePart{ .row = rowIndex, .column = columnIndex, .partNumbers = std.ArrayList(EnginePartNumber).init(std.heap.page_allocator) };
                 engineParts.append(newEnginePart) catch |err| {
                     std.debug.panic("{}\n", .{err});
                 };
@@ -130,11 +139,11 @@ fn findAllEnginePartNumbers(input: std.ArrayList(u8)) std.ArrayList(EnginePartNu
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
     var enginePartList = findAllEngineParts(input, &enginePartCharacters);
-    var enginePartNumbers = findAllEnginePartNumbers(input);
+    const enginePartNumbers = findAllEnginePartNumbers(input);
 
     var i: usize = 0;
     while (i < enginePartNumbers.items.len) : (i += 1) {
-        var partNumber = &enginePartNumbers.items[i];
+        var partNumber = enginePartNumbers.items[i];
         if (partNumber.hasEnginePart) {
             continue;
         }
@@ -142,11 +151,8 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
             if (partNumber.isNearEnginePart(enginePart)) {
                 partNumber.hasEnginePart = true;
                 enginePartList.items[partIndex].assignPartNumber(partNumber);
-                //std.debug.print("epn {}, ep: {}\n", .{ enginePartNumber, enginePart });
             }
-            std.debug.print("{}", .{enginePart});
         }
-        std.debug.print("epn:{}\n", .{partNumber});
         if (partNumber.hasEnginePart) {
             solution += partNumber.value;
         }
@@ -157,11 +163,11 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
 fn solvePart2(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
     var enginePartList = findAllEngineParts(input, &[_]u8{'*'});
-    var enginePartNumbers = findAllEnginePartNumbers(input);
+    const enginePartNumbers = findAllEnginePartNumbers(input);
 
     var i: usize = 0;
     while (i < enginePartNumbers.items.len) : (i += 1) {
-        var partNumber = &enginePartNumbers.items[i];
+        var partNumber = enginePartNumbers.items[i];
         if (partNumber.hasEnginePart) {
             continue;
         }
@@ -169,13 +175,18 @@ fn solvePart2(input: std.ArrayList(u8)) u32 {
             if (partNumber.isNearEnginePart(enginePart)) {
                 partNumber.hasEnginePart = true;
                 enginePartList.items[partIndex].assignPartNumber(partNumber);
-                //std.debug.print("epn {}, ep: {}\n", .{ enginePartNumber, enginePart });
             }
-            std.debug.print("{}", .{enginePart});
         }
-        std.debug.print("epn:{}\n", .{partNumber});
         if (partNumber.hasEnginePart) {
             solution += partNumber.value;
+        }
+    }
+    for (enginePartList.items) |elem| {
+        if (elem.partNumbers) |partNumbers| {
+            elem.print();
+            if (partNumbers.items.len == 2) {
+                solution += partNumbers.items[0].value * partNumbers.items[1].value;
+            }
         }
     }
     return solution;
@@ -188,6 +199,11 @@ pub fn main() !void {
     std.debug.print("part 1 total: {}\n", .{solvePart1(lines)});
     std.debug.print("part 2 total: {}\n", .{solvePart2(lines)});
 }
+
+// ------------------------------
+// TESTS
+//
+//
 
 test "test part 1" {
     const input =
@@ -228,7 +244,7 @@ test "test part 2" {
     try fileContents.appendSlice(input);
     const solution = solvePart2(fileContents);
     std.testing.expect(solution == 467835) catch |err| {
-        std.debug.print("Test error: {} value: {} should be 4361\n", .{ err, solution });
+        std.debug.print("Test error: {} value: {} should be 467835\n", .{ err, solution });
     };
 }
 test "belongsToEnginePart => true" {
