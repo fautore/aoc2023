@@ -177,9 +177,6 @@ fn solvePart2(input: std.ArrayList(u8)) u32 {
                 enginePartList.items[partIndex].assignPartNumber(partNumber);
             }
         }
-        if (partNumber.hasEnginePart) {
-            solution += partNumber.value;
-        }
     }
     for (enginePartList.items) |elem| {
         if (elem.partNumbers) |partNumbers| {
