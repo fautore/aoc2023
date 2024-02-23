@@ -17,7 +17,7 @@ const Card = struct {
     winning: std.ArrayList(u8),
     numbers: std.ArrayList(u8),
 
-    pub fn calculatePoints(self: *Card) u32 {
+    pub fn calculatePoints(self: *const Card) u32 {
         var cardPoints: u32 = 0;
         for (self.numbers.items) |n| {
             for (self.winning.items) |w| {
@@ -34,44 +34,54 @@ const Card = struct {
     }
 };
 
-pub fn parse(row: []const u8) Card {
-    var removeCardNameIter = std.mem.splitAny(u8, row, ": ");
-    if (removeCardNameIter.next()) |cardId| {
-        _ = cardId;
-    }
-    if (removeCardNameIter.next()) |cardNumbers| {
-        var splitWinningAndCard = std.mem.splitAny(u8, cardNumbers, " | ");
-        var winningIter = std.mem.tokenizeScalar(u8, splitWinningAndCard.first(), ' ');
-        var winning = std.ArrayList(u8).init(std.heap.page_allocator);
-        while (winningIter.next()) |number| {
-            const parsedNum: u8 = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
-                std.debug.print("{}", .{err});
-            };
-            winning.append(parsedNum) catch |err| {
-                std.debug.print("{}", .{err});
-            };
+pub fn parse(row: []const u8, rowIndex: u32) ?Card {
+    _ = rowIndex;
+    if (std.mem.indexOf(u8, row, ": ")) |indexOfSeparator| {
+        const newRow = row[indexOfSeparator + 2 .. row.len];
+        if (std.mem.indexOf(u8, newRow, " | ")) |indexOfWinningSeparator| {
+            const winning = newRow[0..indexOfWinningSeparator];
+            const numbers = newRow[indexOfWinningSeparator + 3 .. newRow.len];
+
+            var winningList = std.ArrayList(u8).init(std.heap.page_allocator);
+            var numbersList = std.ArrayList(u8).init(std.heap.page_allocator);
+
+            var wIter = std.mem.tokenizeScalar(u8, winning, ' ');
+            while (wIter.next()) |number| {
+                const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
+                    std.debug.panic("{}", .{err});
+                };
+                winningList.append(parsedNum) catch |err| {
+                    std.debug.print("{}", .{err});
+                };
+            }
+            var nIter = std.mem.tokenizeScalar(u8, numbers, ' ');
+            while (nIter.next()) |number| {
+                const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
+                    std.debug.panic("{}", .{err});
+                };
+                numbersList.append(parsedNum) catch |err| {
+                    std.debug.print("{}", .{err});
+                };
+            }
+            const c = Card{ .winning = winningList, .numbers = numbersList };
+            return c;
+        } else {
+            std.debug.panic("No winning separator!!!!!!", .{});
         }
-        var numbersIter = std.mem.tokenizeScalar(u8, splitWinningAndCard.rest(), ' ');
-        var numbers = std.ArrayList(u8).init(std.heap.page_allocator);
-        while (numbersIter.next()) |number| {
-            const parsedNum: u8 = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
-                std.debug.print("{}", .{err});
-            };
-            numbers.append(parsedNum) catch |err| {
-                std.debug.print("{}", .{err});
-            };
-        }
-        const c = Card{ .winning = winning, .numbers = numbers };
-        return c;
+    } else {
+        return null;
     }
 }
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
     var rowIter = std.mem.splitScalar(u8, input.items, '\n');
+    var rowIndex: u32 = 0;
     while (rowIter.next()) |row| {
-        var c = parse(row);
-        solution += c.calculatePoints();
+        defer rowIndex += 1;
+        if (parse(row, rowIndex)) |c| {
+            solution += c.calculatePoints();
+        }
     }
     return solution;
 }
