@@ -14,8 +14,20 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
 }
 
 const Card = struct {
+    number: u32,
     winning: std.ArrayList(u8),
     numbers: std.ArrayList(u8),
+    pub fn countWins(self: *const Card) u32 {
+        var wins: u32 = 0;
+        for (self.numbers.items) |n| {
+            for (self.winning.items) |w| {
+                if (n == w) {
+                    wins += 1;
+                }
+            }
+        }
+        return wins;
+    }
 
     pub fn calculatePoints(self: *const Card) u32 {
         var cardPoints: u32 = 0;
@@ -34,39 +46,50 @@ const Card = struct {
     }
 };
 
-pub fn parse(row: []const u8, rowIndex: u32) ?Card {
-    _ = rowIndex;
-    if (std.mem.indexOf(u8, row, ": ")) |indexOfSeparator| {
-        const newRow = row[indexOfSeparator + 2 .. row.len];
-        if (std.mem.indexOf(u8, newRow, " | ")) |indexOfWinningSeparator| {
-            const winning = newRow[0..indexOfWinningSeparator];
-            const numbers = newRow[indexOfWinningSeparator + 3 .. newRow.len];
+pub fn parseCard(row: []const u8) ?Card {
+    if (std.mem.indexOf(u8, row, ": ")) |indexOfCardNumberSeparator| {
+        if (std.mem.indexOf(u8, row[0..indexOfCardNumberSeparator], " ")) |indexOfCardNumber| {
+            var cardNumberCharSliceIter = std.mem.tokenizeScalar(u8, row[indexOfCardNumber..indexOfCardNumberSeparator], ' ');
+            if (cardNumberCharSliceIter.next()) |cardNumberCharSlice| {
+                const cardNumber = std.fmt.parseUnsigned(u32, cardNumberCharSlice, 10) catch |err| {
+                    std.debug.panic("error parsing card number {s}, err: {}", .{ row[indexOfCardNumber..indexOfCardNumberSeparator], err });
+                };
+                const newRow = row[indexOfCardNumberSeparator + 2 .. row.len];
+                if (std.mem.indexOf(u8, newRow, " | ")) |indexOfWinningSeparator| {
+                    const winning = newRow[0..indexOfWinningSeparator];
+                    const numbers = newRow[indexOfWinningSeparator + 3 .. newRow.len];
 
-            var winningList = std.ArrayList(u8).init(std.heap.page_allocator);
-            var numbersList = std.ArrayList(u8).init(std.heap.page_allocator);
+                    var winningList = std.ArrayList(u8).init(std.heap.page_allocator);
+                    var numbersList = std.ArrayList(u8).init(std.heap.page_allocator);
 
-            var wIter = std.mem.tokenizeScalar(u8, winning, ' ');
-            while (wIter.next()) |number| {
-                const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
-                    std.debug.panic("{}", .{err});
-                };
-                winningList.append(parsedNum) catch |err| {
-                    std.debug.print("{}", .{err});
-                };
+                    var wIter = std.mem.tokenizeScalar(u8, winning, ' ');
+                    while (wIter.next()) |number| {
+                        const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
+                            std.debug.panic("{}", .{err});
+                        };
+                        winningList.append(parsedNum) catch |err| {
+                            std.debug.print("{}", .{err});
+                        };
+                    }
+                    var nIter = std.mem.tokenizeScalar(u8, numbers, ' ');
+                    while (nIter.next()) |number| {
+                        const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
+                            std.debug.panic("{}", .{err});
+                        };
+                        numbersList.append(parsedNum) catch |err| {
+                            std.debug.print("{}", .{err});
+                        };
+                    }
+                    const c = Card{ .number = cardNumber, .winning = winningList, .numbers = numbersList };
+                    return c;
+                } else {
+                    return null;
+                }
+            } else {
+                std.debug.panic("No winning separator!!!!!!", .{});
             }
-            var nIter = std.mem.tokenizeScalar(u8, numbers, ' ');
-            while (nIter.next()) |number| {
-                const parsedNum = std.fmt.parseUnsigned(u8, number, 10) catch |err| {
-                    std.debug.panic("{}", .{err});
-                };
-                numbersList.append(parsedNum) catch |err| {
-                    std.debug.print("{}", .{err});
-                };
-            }
-            const c = Card{ .winning = winningList, .numbers = numbersList };
-            return c;
         } else {
-            std.debug.panic("No winning separator!!!!!!", .{});
+            return null;
         }
     } else {
         return null;
@@ -76,10 +99,8 @@ pub fn parse(row: []const u8, rowIndex: u32) ?Card {
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     var solution: u32 = 0;
     var rowIter = std.mem.splitScalar(u8, input.items, '\n');
-    var rowIndex: u32 = 0;
     while (rowIter.next()) |row| {
-        defer rowIndex += 1;
-        if (parse(row, rowIndex)) |c| {
+        if (parseCard(row)) |c| {
             solution += c.calculatePoints();
         }
     }
@@ -87,9 +108,35 @@ fn solvePart1(input: std.ArrayList(u8)) u32 {
 }
 
 fn solvePart2(input: std.ArrayList(u8)) u32 {
-    _ = input;
-    const solution: u32 = 0;
-    return solution;
+    var rowIterator = std.mem.splitScalar(u8, input.items, '\n');
+    var originalCards = std.ArrayList(Card).init(std.heap.page_allocator);
+    var totalCards = std.ArrayList(Card).init(std.heap.page_allocator);
+    while (rowIterator.next()) |row| {
+        if (parseCard(row)) |c| {
+            originalCards.append(c) catch |err| {
+                std.debug.panic("err: {}", .{err});
+            };
+            totalCards.append(c) catch |err| {
+                std.debug.panic("err: {}", .{err});
+            };
+        }
+    }
+    var i: usize = 0;
+    while (i < totalCards.items.len) : (i += 1) {
+        const c: Card = totalCards.items[i];
+        const cardWins = c.countWins();
+        //std.debug.print("card no.{} has {} wins\n", .{ c.number, cardWins });
+        if (cardWins > 0) {
+            for (1..cardWins + 1) |offset| {
+                const cardAtOffset = originalCards.items[c.number - 1 + offset];
+                //std.debug.print("appending card no.{}\n", .{cardAtOffset.number});
+                totalCards.append(cardAtOffset) catch |err| {
+                    std.debug.panic("err: {}\n", .{err});
+                };
+            }
+        }
+    }
+    return @intCast(totalCards.items.len);
 }
 
 pub fn main() !void {
@@ -106,6 +153,7 @@ pub fn main() !void {
 //
 
 test "test part 1" {
+    std.debug.print("\n\n", .{});
     const input =
         \\Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
         \\Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
@@ -119,10 +167,11 @@ test "test part 1" {
     try fileContents.appendSlice(input);
     const solution = solvePart1(fileContents);
     std.testing.expect(solution == 13) catch |err| {
-        std.debug.print("Test error: {} value: {} should be 13\n", .{ err, solution });
+        std.debug.panic("Test error: {} value: {} should be 13\n", .{ err, solution });
     };
 }
 test "test part 2" {
+    std.debug.print("\n\n", .{});
     const input =
         \\Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
         \\Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19
@@ -135,7 +184,7 @@ test "test part 2" {
     var fileContents = std.ArrayList(u8).init(allocator);
     try fileContents.appendSlice(input);
     const solution = solvePart2(fileContents);
-    std.testing.expect(solution == 467835) catch |err| {
-        std.debug.print("Test error: {} value: {} should be 467835\n", .{ err, solution });
+    std.testing.expect(solution == 30) catch |err| {
+        std.debug.panic("Test error: {} value: {} should be 30\n", .{ err, solution });
     };
 }
