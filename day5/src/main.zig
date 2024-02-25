@@ -25,10 +25,20 @@ const almanacEntriesType = enum {
 };
 
 fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) {
+    var seeds = std.ArrayList(u32).init(std.heap.page_allocator);
+
     var almanacEntriesIterator = std.mem.splitSequence(u8, input.items, "\n\n");
     while (almanacEntriesIterator.next()) |almanacEntry| {
         std.debug.print("{s}\n", .{almanacEntry});
-        if () {}
+        if (std.mem.indexOf(u8, almanacEntry, ":")) | indexOfColumn | {
+            if (almanacEntry[indexOfColumn - 3 .. indexOfColumn] == "map") {
+                
+            } else {
+                if (almanacEntry[0..indexOfColumn] == "seeds") {
+                    const seedsCharacters = almanacEntry[indexOfColumn + 1.. almanacEntry.len];     
+                }
+            }
+        };
     }
     std.debug.panic("", .{});
 }
