@@ -31,12 +31,21 @@ fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) 
     while (almanacEntriesIterator.next()) |almanacEntry| {
         std.debug.print("{s}\n", .{almanacEntry});
         if (std.mem.indexOf(u8, almanacEntry, ":")) |indexOfColumn| {
-            if (std.mem.eql([]u8, almanacEntry[indexOfColumn - 3 .. indexOfColumn], "map")) {} else {
-                if (std.mem.eql([]u8, almanacEntry[0..indexOfColumn], "seeds")) {
+            if (std.mem.eql(u8, almanacEntry[indexOfColumn - 3 .. indexOfColumn], "map")) {
+                if (std.mem.eql(u8, almanacEntry[0 .. indexOfColumn - 4], "seed-to-soil")) {
+                    std.debug.print("{s}", .{almanacEntry[indexOfColumn + 1 .. almanacEntry.len]});
+                } else {
+                    std.debug.print("{s}", .{almanacEntry[indexOfColumn + 1 .. almanacEntry.len]});
+                }
+            } else {
+                if (std.mem.eql(u8, almanacEntry[0..indexOfColumn], "seeds")) {
                     const seedsCharacters = almanacEntry[indexOfColumn + 1 .. almanacEntry.len];
                     var seedsCharactersIterator = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
                     while (seedsCharactersIterator.next()) |seedCharacter| {
-                        seeds.append(std.fmt.parseInt(u32, seedCharacter, 10)) catch |err| {
+                        const seed = std.fmt.parseInt(u32, seedCharacter, 10) catch |err| {
+                            std.debug.panic("{}", .{err});
+                        };
+                        seeds.append(seed) catch |err| {
                             std.debug.print("{}", .{err});
                         };
                     }
