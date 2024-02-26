@@ -14,14 +14,14 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
 }
 
 const almanacEntriesType = enum {
-    "seeds",
-    "seedToSoil",
-    "soilToFertilizer",
-    "fertilizerToWater",
-    "waterToLight",
-    "lightToTemperature",
-    "temperatureToHumidity",
-    "humidityToLocation",
+    seeds,
+    seedToSoil,
+    soilToFertilizer,
+    fertilizerToWater,
+    waterToLight,
+    lightToTemperature,
+    temperatureToHumidity,
+    humidityToLocation,
 };
 
 fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) {
@@ -30,15 +30,19 @@ fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) 
     var almanacEntriesIterator = std.mem.splitSequence(u8, input.items, "\n\n");
     while (almanacEntriesIterator.next()) |almanacEntry| {
         std.debug.print("{s}\n", .{almanacEntry});
-        if (std.mem.indexOf(u8, almanacEntry, ":")) | indexOfColumn | {
-            if (almanacEntry[indexOfColumn - 3 .. indexOfColumn] == "map") {
-                
-            } else {
-                if (almanacEntry[0..indexOfColumn] == "seeds") {
-                    const seedsCharacters = almanacEntry[indexOfColumn + 1.. almanacEntry.len];     
+        if (std.mem.indexOf(u8, almanacEntry, ":")) |indexOfColumn| {
+            if (std.mem.eql([]u8, almanacEntry[indexOfColumn - 3 .. indexOfColumn], "map")) {} else {
+                if (std.mem.eql([]u8, almanacEntry[0..indexOfColumn], "seeds")) {
+                    const seedsCharacters = almanacEntry[indexOfColumn + 1 .. almanacEntry.len];
+                    var seedsCharactersIterator = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
+                    while (seedsCharactersIterator.next()) |seedCharacter| {
+                        seeds.append(std.fmt.parseInt(u32, seedCharacter, 10)) catch |err| {
+                            std.debug.print("{}", .{err});
+                        };
+                    }
                 }
             }
-        };
+        }
     }
     std.debug.panic("", .{});
 }
