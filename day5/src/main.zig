@@ -13,19 +13,41 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
     return fileContents;
 }
 
-const almanacEntriesType = enum {
-    seeds,
-    seedToSoil,
-    soilToFertilizer,
-    fertilizerToWater,
-    waterToLight,
-    lightToTemperature,
-    temperatureToHumidity,
-    humidityToLocation,
+const MapEntry = struct {
+    destination: u32,
+    source: u32,
+    range: u32,
 };
+fn parseAlmanacEntry(entry: []const u8) std.ArrayList(MapEntry) {
+    var almanacEntryLines = std.mem.splitScalar(u8, entry, '\n');
+    var almanacEntry = std.ArrayList(MapEntry).init(std.heap.page_allocator);
+    while (almanacEntryLines.next()) |elem| {
+        var digitsIterator = std.mem.tokenizeScalar(u8, elem, ' ');
+        if (digitsIterator.next()) |firstDigitStr| {
+            const firstDigit = std.fmt.parseUnsigned(u32, firstDigitStr, 10) catch |err| {
+                std.debug.panic("{}", .{err});
+            };
+            if (digitsIterator.next()) |secondDigitStr| {
+                const secondDigit = std.fmt.parseUnsigned(u32, secondDigitStr, 10) catch |err| {
+                    std.debug.panic("{}", .{err});
+                };
+                if (digitsIterator.next()) |thirdDigitStr| {
+                    const thirdDigit = std.fmt.parseUnsigned(u32, thirdDigitStr, 10) catch |err| {
+                        std.debug.panic("{}", .{err});
+                    };
+                    almanacEntry.append(MapEntry{ .destination = firstDigit, .source = secondDigit, .range = thirdDigit }) catch |err| {
+                        std.debug.panic("{}", .{err});
+                    };
+                }
+            }
+        }
+    }
+    return almanacEntry;
+}
 
 fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) {
     var seeds = std.ArrayList(u32).init(std.heap.page_allocator);
+    var seedToSoil: std.ArrayList(MapEntry);
 
     var almanacEntriesIterator = std.mem.splitSequence(u8, input.items, "\n\n");
     while (almanacEntriesIterator.next()) |almanacEntry| {
@@ -33,7 +55,7 @@ fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) 
         if (std.mem.indexOf(u8, almanacEntry, ":")) |indexOfColumn| {
             if (std.mem.eql(u8, almanacEntry[indexOfColumn - 3 .. indexOfColumn], "map")) {
                 if (std.mem.eql(u8, almanacEntry[0 .. indexOfColumn - 4], "seed-to-soil")) {
-                    std.debug.print("{s}", .{almanacEntry[indexOfColumn + 1 .. almanacEntry.len]});
+                    seedToSoil = parseAlmanacEntry(almanacEntry[indexOfColumn + 1 .. almanacEntry.len]);
                 } else {
                     std.debug.print("{s}", .{almanacEntry[indexOfColumn + 1 .. almanacEntry.len]});
                 }
