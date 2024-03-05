@@ -18,68 +18,117 @@ const MapEntry = struct {
     source: u32,
     range: u32,
 };
-fn parseAlmanacEntry(entry: []const u8) std.ArrayList(MapEntry) {
-    var almanacEntryLines = std.mem.splitScalar(u8, entry, '\n');
-    var almanacEntry = std.ArrayList(MapEntry).init(std.heap.page_allocator);
-    while (almanacEntryLines.next()) |elem| {
-        var digitsIterator = std.mem.tokenizeScalar(u8, elem, ' ');
-        if (digitsIterator.next()) |firstDigitStr| {
-            const firstDigit = std.fmt.parseUnsigned(u32, firstDigitStr, 10) catch |err| {
-                std.debug.panic("{}", .{err});
-            };
-            if (digitsIterator.next()) |secondDigitStr| {
-                const secondDigit = std.fmt.parseUnsigned(u32, secondDigitStr, 10) catch |err| {
-                    std.debug.panic("{}", .{err});
-                };
-                if (digitsIterator.next()) |thirdDigitStr| {
-                    const thirdDigit = std.fmt.parseUnsigned(u32, thirdDigitStr, 10) catch |err| {
-                        std.debug.panic("{}", .{err});
-                    };
-                    almanacEntry.append(MapEntry{ .destination = firstDigit, .source = secondDigit, .range = thirdDigit }) catch |err| {
-                        std.debug.panic("{}", .{err});
-                    };
-                }
-            }
-        }
+
+const AlmanacEntryType = enum { seed, soil, fertilizer, water, light, temperature, humidity, location };
+fn parseEntryType(token: []const u8) AlmanacEntryType {
+    // TODO: research how to do this with comptime
+    if (std.mem.eql(u8, token, "seed")) {
+        return AlmanacEntryType.seed;
+    } else if (std.mem.eql(u8, token, "soil")) {
+        return AlmanacEntryType.soil;
+    } else if (std.mem.eql(u8, token, "fertilizer")) {
+        return AlmanacEntryType.fertilizer;
+    } else if (std.mem.eql(u8, token, "water")) {
+        return AlmanacEntryType.water;
+    } else if (std.mem.eql(u8, token, "light")) {
+        return AlmanacEntryType.light;
+    } else if (std.mem.eql(u8, token, "temperature")) {
+        return AlmanacEntryType.temperature;
+    } else if (std.mem.eql(u8, token, "humidity")) {
+        return AlmanacEntryType.humidity;
+    } else if (std.mem.eql(u8, token, "location")) {
+        return AlmanacEntryType.location;
+    } else {
+        std.debug.panic("token {s} is not a valid entry type", .{token});
     }
-    return almanacEntry;
 }
 
-fn getAlmanacEntries(input: std.ArrayList(u8)) std.ArrayList(std.ArrayList(u8)) {
-    var seeds = std.ArrayList(u32).init(std.heap.page_allocator);
-    var seedToSoil: std.ArrayList(MapEntry);
+const AlmanacEntry = struct {
+    from: AlmanacEntryType,
+    to: AlmanacEntryType,
+    map: std.ArrayList(MapEntry),
 
-    var almanacEntriesIterator = std.mem.splitSequence(u8, input.items, "\n\n");
-    while (almanacEntriesIterator.next()) |almanacEntry| {
-        std.debug.print("{s}\n", .{almanacEntry});
-        if (std.mem.indexOf(u8, almanacEntry, ":")) |indexOfColumn| {
-            if (std.mem.eql(u8, almanacEntry[indexOfColumn - 3 .. indexOfColumn], "map")) {
-                if (std.mem.eql(u8, almanacEntry[0 .. indexOfColumn - 4], "seed-to-soil")) {
-                    seedToSoil = parseAlmanacEntry(almanacEntry[indexOfColumn + 1 .. almanacEntry.len]);
-                } else {
-                    std.debug.print("{s}", .{almanacEntry[indexOfColumn + 1 .. almanacEntry.len]});
+    fn parse(entry: []const u8) AlmanacEntry {
+        if (std.mem.indexOf(u8, entry, ":")) |indexOfColumn| {
+            const entryDescriptor = std.heap.page_allocator.alloc(
+                u8,
+            ) catch |err| {
+                std.debug.panic("{}", .{err});
+            };
+            _ = std.mem.replace(u8, entry, " map:", "", entryDescriptor);
+            std.debug.print("entry descriptor {s}", .{entryDescriptor});
+            var entryDescriptorTokens = std.mem.tokenizeAny(u8, entryDescriptor, "-to-");
+            if (entryDescriptorTokens.next()) |fromToken| {
+                std.debug.print("from token: {s}", .{fromToken});
+                const from: AlmanacEntryType = parseEntryType(fromToken);
+                if (entryDescriptorTokens.next()) |toToken| {
+                    std.debug.print("from token: {s}", .{toToken});
+                    const to: AlmanacEntryType = parseEntryType(toToken);
+
+                    var map = std.ArrayList(MapEntry).init(std.heap.page_allocator);
+                    var almanacEntryLines = std.mem.splitScalar(u8, entry[0 .. indexOfColumn + 2], '\n');
+                    while (almanacEntryLines.next()) |elem| {
+                        var digitsIterator = std.mem.tokenizeScalar(u8, elem, ' ');
+                        if (digitsIterator.next()) |firstDigitStr| {
+                            const firstDigit = std.fmt.parseUnsigned(u32, firstDigitStr, 10) catch |err| {
+                                std.debug.panic("{}", .{err});
+                            };
+                            if (digitsIterator.next()) |secondDigitStr| {
+                                const secondDigit = std.fmt.parseUnsigned(u32, secondDigitStr, 10) catch |err| {
+                                    std.debug.panic("{}", .{err});
+                                };
+                                if (digitsIterator.next()) |thirdDigitStr| {
+                                    const thirdDigit = std.fmt.parseUnsigned(u32, thirdDigitStr, 10) catch |err| {
+                                        std.debug.panic("{}", .{err});
+                                    };
+                                    map.append(MapEntry{ .destination = firstDigit, .source = secondDigit, .range = thirdDigit }) catch |err| {
+                                        std.debug.panic("{}", .{err});
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    return AlmanacEntry{ .from = from, .to = to, .map = map };
+                } else std.debug.panic("no to token detected in entry {s}", .{entry});
+            } else std.debug.panic("no from token detected in entry {s}", .{entry});
+        } else std.debug.panic("no column in entry {s}", .{entry});
+    }
+};
+
+fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u32), entries: std.ArrayList(AlmanacEntry) } {
+    var seeds = std.ArrayList(u32).init(std.heap.page_allocator);
+    var entries = std.ArrayList(AlmanacEntry).init(std.heap.page_allocator);
+
+    if (std.mem.indexOf(u8, input.items, ":")) |indexOfColumn| {
+        if (std.mem.eql(u8, input.items[0..indexOfColumn], "seeds")) {
+            if (std.mem.indexOf(u8, input.items, "\n")) |indexOfNewLine| {
+                const seedsCharacters = input.items[indexOfColumn + 1 .. indexOfNewLine];
+                var seedsCharactersIterator = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
+                while (seedsCharactersIterator.next()) |seedCharacter| {
+                    const seed = std.fmt.parseInt(u32, seedCharacter, 10) catch |err| {
+                        std.debug.panic("{}", .{err});
+                    };
+                    seeds.append(seed) catch |err| {
+                        std.debug.print("{}", .{err});
+                    };
                 }
-            } else {
-                if (std.mem.eql(u8, almanacEntry[0..indexOfColumn], "seeds")) {
-                    const seedsCharacters = almanacEntry[indexOfColumn + 1 .. almanacEntry.len];
-                    var seedsCharactersIterator = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
-                    while (seedsCharactersIterator.next()) |seedCharacter| {
-                        const seed = std.fmt.parseInt(u32, seedCharacter, 10) catch |err| {
+                if (std.mem.indexOf(u8, input.items, "\n")) |firstNewLineIndex| {
+                    var almanacEntriesIterator = std.mem.splitSequence(u8, input.items[firstNewLineIndex + 1 .. input.items.len], "\n\n");
+                    while (almanacEntriesIterator.next()) |almanacEntry| {
+                        entries.append(AlmanacEntry.parse(almanacEntry)) catch |err| {
                             std.debug.panic("{}", .{err});
                         };
-                        seeds.append(seed) catch |err| {
-                            std.debug.print("{}", .{err});
-                        };
                     }
-                }
-            }
-        }
-    }
-    std.debug.panic("", .{});
+                    return .{ .seeds = seeds, .entries = entries };
+                } else std.debug.panic("error eosdfasdfasdfasdf", .{});
+            } else std.debug.panic("no newline after seeds found", .{});
+        } else std.debug.panic("no seeds line found", .{});
+    } else std.debug.panic("no ':' character found", .{});
 }
 
 fn solvePart1(input: std.ArrayList(u8)) u32 {
-    _ = getAlmanacEntries(input);
+    const almanac = parseAlamanac(input);
+    std.debug.print("{}", .{almanac});
     return 0;
 }
 
