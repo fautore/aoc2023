@@ -22,6 +22,7 @@ const MapEntry = struct {
 const AlmanacEntryType = enum { seed, soil, fertilizer, water, light, temperature, humidity, location };
 fn parseEntryType(token: []const u8) AlmanacEntryType {
     // TODO: research how to do this with comptime
+    std.debug.print("token: {s}\n", .{token});
     if (std.mem.eql(u8, token, "seed")) {
         return AlmanacEntryType.seed;
     } else if (std.mem.eql(u8, token, "soil")) {
@@ -39,7 +40,7 @@ fn parseEntryType(token: []const u8) AlmanacEntryType {
     } else if (std.mem.eql(u8, token, "location")) {
         return AlmanacEntryType.location;
     } else {
-        std.debug.panic("token {s} is not a valid entry type", .{token});
+        std.debug.panic("token {s} is not a valid entry type\n", .{token});
     }
 }
 
@@ -50,19 +51,17 @@ const AlmanacEntry = struct {
 
     fn parse(entry: []const u8) AlmanacEntry {
         if (std.mem.indexOf(u8, entry, ":")) |indexOfColumn| {
-            const entryDescriptor = std.heap.page_allocator.alloc(
-                u8,
-            ) catch |err| {
+            const entryDescriptor = std.heap.page_allocator.alloc(u8, entry.len - 4) catch |err| {
                 std.debug.panic("{}", .{err});
             };
-            _ = std.mem.replace(u8, entry, " map:", "", entryDescriptor);
-            std.debug.print("entry descriptor {s}", .{entryDescriptor});
+            _ = std.mem.replace(u8, entry, " map:\n", "", entryDescriptor);
+            std.debug.print("entry descriptor {s}\n", .{entryDescriptor});
             var entryDescriptorTokens = std.mem.tokenizeAny(u8, entryDescriptor, "-to-");
             if (entryDescriptorTokens.next()) |fromToken| {
-                std.debug.print("from token: {s}", .{fromToken});
+                std.debug.print("from token: {s}\n", .{fromToken});
                 const from: AlmanacEntryType = parseEntryType(fromToken);
                 if (entryDescriptorTokens.next()) |toToken| {
-                    std.debug.print("from token: {s}", .{toToken});
+                    std.debug.print("from token: {s}\n", .{toToken});
                     const to: AlmanacEntryType = parseEntryType(toToken);
 
                     var map = std.ArrayList(MapEntry).init(std.heap.page_allocator);
