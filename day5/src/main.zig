@@ -109,8 +109,8 @@ const AlmanacEntry = struct {
     }
 };
 
-fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u32), entries: std.ArrayList(AlmanacEntry) } {
-    var seeds = std.ArrayList(u32).init(std.heap.page_allocator);
+fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u64), entries: std.ArrayList(AlmanacEntry) } {
+    var seeds = std.ArrayList(u64).init(std.heap.page_allocator);
     var entries = std.ArrayList(AlmanacEntry).init(std.heap.page_allocator);
 
     if (std.mem.indexOf(u8, input.items, ":")) |indexOfColumn| {
@@ -140,30 +140,50 @@ fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u32), e
     } else std.debug.panic("no ':' character found", .{});
 }
 
-fn walkAlmanac(values: std.ArrayList(u32), entries: std.ArrayList(AlmanacEntry), search: AlmanacEntryType) std.ArrayList(u32) {
+fn walkAlmanac(values: []u64, entries: std.ArrayList(AlmanacEntry), search: AlmanacEntryType) []u64 {
     for (entries.items) |entry| {
         if (entry.from == search) {
-            var ret = std.ArrayList(u32).init(std.heap.page_allocator);
-            for (values.items) |v| {
+            std.debug.print("visiting {}->{} entry\n", .{ entry.from, entry.to });
+            var convertedValues = std.ArrayList(u64).init(std.heap.page_allocator);
+            for (values) |v| {
+                var match = false;
                 for (entry.map.items) |i| {
                     if (v >= i.source and v < i.source + i.range) {
-                        ret.append(v - i.source + i.destination) catch |err| {
+                        const convertedValue = v - i.source + i.destination;
+                        std.debug.print("{} -> {}\n", .{ v, convertedValue });
+                        convertedValues.append(convertedValue) catch |err| {
                             std.debug.panic("{}", .{err});
                         };
+                        match = true;
                     }
                 }
+                if (!match) {
+                    std.debug.print("{} -> {}\n", .{ v, v });
+                    convertedValues.append(v) catch |err| {
+                        std.debug.panic("{}", .{err});
+                    };
+                }
+            }
+            if (entry.to == AlmanacEntryType.location) {
+                return convertedValues.items;
+            } else {
+                return walkAlmanac(convertedValues.items, entries, entry.to);
             }
         }
     }
+    std.debug.panic("no entry with {} as from\n", .{search});
 }
 
-fn solvePart1(input: std.ArrayList(u8)) u32 {
+fn solvePart1(input: std.ArrayList(u8)) u64 {
     const almanac = parseAlamanac(input);
-    _ = almanac;
-    return 0;
+    std.debug.print("seeds: {any}\n", .{almanac.seeds.items});
+    const locations = walkAlmanac(almanac.seeds.items, almanac.entries, AlmanacEntryType.seed);
+    std.debug.print("locations: {any}\n", .{locations});
+    const minLocation = std.mem.min(u64, locations);
+    return minLocation;
 }
 
-fn solvePart2(input: std.ArrayList(u8)) u32 {
+fn solvePart2(input: std.ArrayList(u8)) u64 {
     _ = input;
     return 0;
 }
