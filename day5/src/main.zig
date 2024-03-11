@@ -13,12 +13,6 @@ fn readFile(allocator: std.mem.Allocator, filename: []const u8) !std.ArrayList(u
     return fileContents;
 }
 
-const MapEntry = struct {
-    destination: u32,
-    source: u32,
-    range: u32,
-};
-
 const AlmanacEntryType = enum { seed, soil, fertilizer, water, light, temperature, humidity, location };
 fn parseEntryType(token: []const u8) AlmanacEntryType {
     // TODO: research how to do this with comptime
@@ -71,6 +65,12 @@ fn getEntryDescriptor(entry: []const u8) struct { from: AlmanacEntryType, to: Al
         } else std.debug.panic("to has no value in entry: {s}\n", .{entry});
     } else std.debug.panic("from has no value in entry: {s}\n", .{entry});
 }
+
+const MapEntry = struct {
+    destination: u32,
+    source: u32,
+    range: u32,
+};
 
 const AlmanacEntry = struct {
     from: AlmanacEntryType,
@@ -140,9 +140,26 @@ fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u32), e
     } else std.debug.panic("no ':' character found", .{});
 }
 
+fn walkAlmanac(values: std.ArrayList(u32), entries: std.ArrayList(AlmanacEntry), search: AlmanacEntryType) std.ArrayList(u32) {
+    for (entries.items) |entry| {
+        if (entry.from == search) {
+            var ret = std.ArrayList(u32).init(std.heap.page_allocator);
+            for (values.items) |v| {
+                for (entry.map.items) |i| {
+                    if (v >= i.source and v < i.source + i.range) {
+                        ret.append(v - i.source + i.destination) catch |err| {
+                            std.debug.panic("{}", .{err});
+                        };
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn solvePart1(input: std.ArrayList(u8)) u32 {
     const almanac = parseAlamanac(input);
-    std.debug.print("{}", .{almanac});
+    _ = almanac;
     return 0;
 }
 
