@@ -67,9 +67,9 @@ fn getEntryDescriptor(entry: []const u8) struct { from: AlmanacEntryType, to: Al
 }
 
 const MapEntry = struct {
-    destination: u32,
-    source: u32,
-    range: u32,
+    destination: u64,
+    source: u64,
+    range: u64,
 };
 
 const AlmanacEntry = struct {
@@ -86,15 +86,15 @@ const AlmanacEntry = struct {
             while (almanacEntryLines.next()) |elem| {
                 var digitsIterator = std.mem.tokenizeScalar(u8, elem, ' ');
                 if (digitsIterator.next()) |firstDigitStr| {
-                    const firstDigit = std.fmt.parseUnsigned(u32, firstDigitStr, 10) catch |err| {
+                    const firstDigit = std.fmt.parseUnsigned(u64, firstDigitStr, 10) catch |err| {
                         std.debug.panic("{}", .{err});
                     };
                     if (digitsIterator.next()) |secondDigitStr| {
-                        const secondDigit = std.fmt.parseUnsigned(u32, secondDigitStr, 10) catch |err| {
+                        const secondDigit = std.fmt.parseUnsigned(u64, secondDigitStr, 10) catch |err| {
                             std.debug.panic("{}", .{err});
                         };
                         if (digitsIterator.next()) |thirdDigitStr| {
-                            const thirdDigit = std.fmt.parseUnsigned(u32, thirdDigitStr, 10) catch |err| {
+                            const thirdDigit = std.fmt.parseUnsigned(u64, thirdDigitStr, 10) catch |err| {
                                 std.debug.panic("{}", .{err});
                             };
                             map.append(MapEntry{ .destination = firstDigit, .source = secondDigit, .range = thirdDigit }) catch |err| {
@@ -119,7 +119,7 @@ fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u64), e
                 const seedsCharacters = input.items[indexOfColumn + 1 .. indexOfNewLine];
                 var seedsCharactersIterator = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
                 while (seedsCharactersIterator.next()) |seedCharacter| {
-                    const seed = std.fmt.parseInt(u32, seedCharacter, 10) catch |err| {
+                    const seed = std.fmt.parseInt(u64, seedCharacter, 10) catch |err| {
                         std.debug.panic("{}", .{err});
                     };
                     seeds.append(seed) catch |err| {
