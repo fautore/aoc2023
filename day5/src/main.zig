@@ -72,6 +72,8 @@ const MapEntry = struct {
     range: u64,
 };
 
+const SeedGroup = struct { start: u64, range: u64 };
+
 const AlmanacEntry = struct {
     from: AlmanacEntryType,
     to: AlmanacEntryType,
@@ -108,11 +110,8 @@ const AlmanacEntry = struct {
         } else std.debug.panic("no column in enty {s}", .{entry});
     }
 };
-
-fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u64), entries: std.ArrayList(AlmanacEntry) } {
+fn parseAlmanacSeedsPart1(input: std.ArrayList(u8)) std.ArrayList(u64) {
     var seeds = std.ArrayList(u64).init(std.heap.page_allocator);
-    var entries = std.ArrayList(AlmanacEntry).init(std.heap.page_allocator);
-
     if (std.mem.indexOf(u8, input.items, ":")) |indexOfColumn| {
         if (std.mem.eql(u8, input.items[0..indexOfColumn], "seeds")) {
             if (std.mem.indexOf(u8, input.items, "\n")) |indexOfNewLine| {
@@ -123,21 +122,62 @@ fn parseAlamanac(input: std.ArrayList(u8)) struct { seeds: std.ArrayList(u64), e
                         std.debug.panic("{}", .{err});
                     };
                     seeds.append(seed) catch |err| {
-                        std.debug.print("{}", .{err});
+                        std.debug.panic("{}", .{err});
                     };
                 }
-                if (std.mem.indexOf(u8, input.items, "\n")) |firstNewLineIndex| {
-                    var almanacEntriesIterator = std.mem.splitSequence(u8, input.items[firstNewLineIndex + 1 .. input.items.len], "\n\n");
-                    while (almanacEntriesIterator.next()) |almanacEntry| {
-                        entries.append(AlmanacEntry.parse(almanacEntry)) catch |err| {
-                            std.debug.panic("{}", .{err});
-                        };
-                    }
-                    return .{ .seeds = seeds, .entries = entries };
-                } else std.debug.panic("error eosdfasdfasdfasdf", .{});
+                return seeds;
             } else std.debug.panic("no newline after seeds found", .{});
         } else std.debug.panic("no seeds line found", .{});
     } else std.debug.panic("no ':' character found", .{});
+}
+
+fn parseAlmanacSeedsPart2(input: std.ArrayList(u8)) std.ArrayList(SeedGroup) {
+    var seeds = std.ArrayList(SeedGroup).init(std.heap.page_allocator);
+    if (std.mem.indexOf(u8, input.items, ":")) |indexOfColumn| {
+        if (std.mem.eql(u8, input.items[0..indexOfColumn], "seeds")) {
+            if (std.mem.indexOf(u8, input.items, "\n")) |indexofnewline| {
+                const seedsCharacters = input.items[indexOfColumn + 1 .. indexofnewline];
+                var seedsCharactersIter = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
+
+                var elem1: ?u64 = undefined;
+                var elem2: ?u64 = undefined;
+                while (seedsCharactersIter.next()) |seedCharacter| {
+                    const seed = std.fmt.parseInt(u64, seedCharacter, 10) catch |err| {
+                        std.debug.panic("{}", .{err});
+                    };
+                    if (elem1 == null) {
+                        elem1 = seed;
+                    }
+                    if (elem2 == null) {
+                        elem2 = seed;
+                    }
+                    if (elem1) |start| {
+                        if (elem2) |range| {
+                            seeds.append(SeedGroup{ .start = start, .range = range }) catch |err| {
+                                std.debug.panic("{}", .{err});
+                            };
+                            elem1 = undefined;
+                            elem2 = undefined;
+                        }
+                    }
+                }
+                return seeds;
+            }
+        }
+    }
+}
+
+fn parseAlamanac(input: std.ArrayList(u8)) std.ArrayList(AlmanacEntry) {
+    var entries = std.ArrayList(AlmanacEntry).init(std.heap.page_allocator);
+    if (std.mem.indexOf(u8, input.items, "\n")) |firstNewLineIndex| {
+        var almanacEntriesIterator = std.mem.splitSequence(u8, input.items[firstNewLineIndex + 1 .. input.items.len], "\n\n");
+        while (almanacEntriesIterator.next()) |almanacEntry| {
+            entries.append(AlmanacEntry.parse(almanacEntry)) catch |err| {
+                std.debug.panic("{}", .{err});
+            };
+        }
+        return entries;
+    } else std.debug.panic("error eosdfasdfasdfasdf", .{});
 }
 
 fn walkAlmanac(values: []u64, entries: std.ArrayList(AlmanacEntry), search: AlmanacEntryType) []u64 {
@@ -175,17 +215,22 @@ fn walkAlmanac(values: []u64, entries: std.ArrayList(AlmanacEntry), search: Alma
 }
 
 fn solvePart1(input: std.ArrayList(u8)) u64 {
+    const seeds = parseAlmanacSeedsPart1(input);
     const almanac = parseAlamanac(input);
-    std.debug.print("seeds: {any}\n", .{almanac.seeds.items});
-    const locations = walkAlmanac(almanac.seeds.items, almanac.entries, AlmanacEntryType.seed);
+    std.debug.print("seeds: {any}\n", .{seeds.items});
+    const locations = walkAlmanac(seeds.items, almanac, AlmanacEntryType.seed);
     std.debug.print("locations: {any}\n", .{locations});
     const minLocation = std.mem.min(u64, locations);
     return minLocation;
 }
 
 fn solvePart2(input: std.ArrayList(u8)) u64 {
-    _ = input;
-    return 0;
+    const seeds = parseAlmanacSeedsPart2(input);
+    std.debug.print("{}", .{seeds});
+    const almanac = parseAlamanac(input);
+    const locations = walkAlmanac(seeds.items, almanac, AlmanacEntryType.seed);
+    const minLocation = std.mem.min(u64, locations);
+    return minLocation;
 }
 
 pub fn main() !void {
@@ -250,7 +295,7 @@ test "test part 1" {
 }
 test "test part 2" {
     std.debug.print("\n", .{});
-    const testSolution: u32 = 35;
+    const testSolution: u32 = 46;
 
     const allocator = std.heap.page_allocator;
     var fileContents = std.ArrayList(u8).init(allocator);
