@@ -51,11 +51,9 @@ fn getEntryDescriptor(entry: []const u8) struct { from: AlmanacEntryType, to: Al
         const descriptor = if (std.mem.lastIndexOf(u8, entry[0..indexOfMap], "\n")) |indexOfNewLine| entry[indexOfNewLine + 1 .. indexOfMap] else entry[0..indexOfMap];
         var entryDescriptorTokens = std.mem.tokenizeSequence(u8, descriptor, "-to-");
         if (entryDescriptorTokens.next()) |fromToken| {
-            std.debug.print("from token: {s}\n", .{fromToken});
             from = parseEntryType(fromToken);
         }
         if (entryDescriptorTokens.next()) |toToken| {
-            std.debug.print("to token: {s}\n", .{toToken});
             to = parseEntryType(toToken);
         }
     } else std.debug.panic("no map", .{});
@@ -71,8 +69,6 @@ const MapEntry = struct {
     source: u64,
     range: u64,
 };
-
-const SeedGroup = struct { start: u64, range: u64 };
 
 const AlmanacEntry = struct {
     from: AlmanacEntryType,
@@ -131,40 +127,42 @@ fn parseAlmanacSeedsPart1(input: std.ArrayList(u8)) std.ArrayList(u64) {
     } else std.debug.panic("no ':' character found", .{});
 }
 
-fn parseAlmanacSeedsPart2(input: std.ArrayList(u8)) std.ArrayList(SeedGroup) {
-    var seeds = std.ArrayList(SeedGroup).init(std.heap.page_allocator);
+fn parseAlmanacSeedsPart2(input: std.ArrayList(u8)) std.ArrayList(u64) {
+    var seeds = std.ArrayList(u64).init(std.heap.page_allocator);
     if (std.mem.indexOf(u8, input.items, ":")) |indexOfColumn| {
         if (std.mem.eql(u8, input.items[0..indexOfColumn], "seeds")) {
             if (std.mem.indexOf(u8, input.items, "\n")) |indexofnewline| {
                 const seedsCharacters = input.items[indexOfColumn + 1 .. indexofnewline];
                 var seedsCharactersIter = std.mem.tokenizeScalar(u8, seedsCharacters, ' ');
 
-                var elem1: ?u64 = undefined;
-                var elem2: ?u64 = undefined;
+                var elem1: ?u64 = null;
+                var elem2: ?u64 = null;
                 while (seedsCharactersIter.next()) |seedCharacter| {
                     const seed = std.fmt.parseInt(u64, seedCharacter, 10) catch |err| {
                         std.debug.panic("{}", .{err});
                     };
                     if (elem1 == null) {
                         elem1 = seed;
-                    }
-                    if (elem2 == null) {
+                    } else if (elem2 == null) {
                         elem2 = seed;
                     }
                     if (elem1) |start| {
                         if (elem2) |range| {
-                            seeds.append(SeedGroup{ .start = start, .range = range }) catch |err| {
-                                std.debug.panic("{}", .{err});
-                            };
-                            elem1 = undefined;
-                            elem2 = undefined;
+                            elem1 = null;
+                            elem2 = null;
+                            std.debug.print("start: {} range: {}", .{ start, range });
+                            for (start..start + range) |value| {
+                                seeds.append(value) catch |err| {
+                                    std.debug.panic("{}", .{err});
+                                };
+                            }
                         }
                     }
                 }
                 return seeds;
-            }
-        }
-    }
+            } else std.debug.panic("no new line character", .{});
+        } else std.debug.panic("no \"seeds\" present", .{});
+    } else std.debug.panic("no index of column", .{});
 }
 
 fn parseAlamanac(input: std.ArrayList(u8)) std.ArrayList(AlmanacEntry) {
@@ -183,14 +181,14 @@ fn parseAlamanac(input: std.ArrayList(u8)) std.ArrayList(AlmanacEntry) {
 fn walkAlmanac(values: []u64, entries: std.ArrayList(AlmanacEntry), search: AlmanacEntryType) []u64 {
     for (entries.items) |entry| {
         if (entry.from == search) {
-            std.debug.print("visiting {}->{} entry\n", .{ entry.from, entry.to });
+            // std.debug.print("visiting {}->{} entry\n", .{ entry.from, entry.to });
             var convertedValues = std.ArrayList(u64).init(std.heap.page_allocator);
             for (values) |v| {
                 var match = false;
                 for (entry.map.items) |i| {
                     if (v >= i.source and v < i.source + i.range) {
                         const convertedValue = v - i.source + i.destination;
-                        std.debug.print("{} -> {}\n", .{ v, convertedValue });
+                        // std.debug.print("{} -> {}\n", .{ v, convertedValue });
                         convertedValues.append(convertedValue) catch |err| {
                             std.debug.panic("{}", .{err});
                         };
@@ -198,7 +196,7 @@ fn walkAlmanac(values: []u64, entries: std.ArrayList(AlmanacEntry), search: Alma
                     }
                 }
                 if (!match) {
-                    std.debug.print("{} -> {}\n", .{ v, v });
+                    // std.debug.print("{} -> {}\n", .{ v, v });
                     convertedValues.append(v) catch |err| {
                         std.debug.panic("{}", .{err});
                     };
